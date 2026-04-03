@@ -1,0 +1,119 @@
+====================================================================
+PART B — GenAI Prompts Used (Adopted Suggestions)
+Course: 6009CMD Artificial Neural Networks, Coventry University
+Tool:   Claude 3.5 Sonnet (Anthropic), accessed via claude.ai
+====================================================================
+
+The following prompts were submitted to Claude 3.5 Sonnet during the
+design and refinement phase of Part B.  Each entry records:
+  - the prompt as submitted
+  - the suggestion returned
+  - what was adopted and why
+
+--------------------------------------------------------------------
+PROMPT 1 — Architecture expansion
+Date: approx. session 1
+--------------------------------------------------------------------
+Prompt:
+  "I have a baseline ANN for network intrusion detection on UNSW-NB15
+   with architecture 128→64→32, Dropout(0.3), Adam lr=1e-3, batch 512.
+   The model struggles with minority attack classes (Worms, Shellcode,
+   Analysis) that have <500 training samples.  What architecture changes
+   would you suggest to improve recall on these classes without
+   overfitting to the majority class (Normal, ~37k samples)?"
+
+Claude's response (summarised):
+  - Widen the first hidden layer to 256 to capture more diverse feature
+    combinations from the ~190 post-encoding dimensions
+  - Add BatchNorm after each Linear layer to stabilise training on the
+    mixed-scale feature space (continuous flow stats + one-hot binary)
+  - Use graduated dropout (0.4/0.3/0.2) — stronger near input to force
+    complementary representations, lighter near output to preserve
+    class-boundary information for the softmax layer
+
+Adopted:
+  - Layer widths changed to 256→128→64 ✓
+  - BatchNorm1d added after each Linear layer ✓
+  - Dropout changed to 0.4/0.3/0.2 ✓
+
+Not adopted from this prompt:
+  - "Consider adding a 4th hidden layer (64→32)" — rejected because it
+    added complexity without clear benefit for a tabular dataset and
+    would make comparison less clean; see prompts_rejected.txt
+
+--------------------------------------------------------------------
+PROMPT 2 — Learning rate and batch size with L2
+Date: approx. session 1
+--------------------------------------------------------------------
+Prompt:
+  "Given that I'm adding BatchNorm and want to use L2 regularisation
+   (weight_decay in Adam) alongside the wider architecture, should I
+   adjust the learning rate or batch size?  Currently using lr=1e-3
+   and batch=512."
+
+Claude's response (summarised):
+  - With BatchNorm, a slightly lower LR (5e-4) is safer — BN smooths
+    the loss landscape so a large LR can cause unstable oscillations
+  - Smaller batch size (256 vs 512) improves gradient noise as a
+    regulariser, which synergises with L2 — effectively two complementary
+    regularisation mechanisms
+  - weight_decay=1e-4 is a safe starting point for tabular data; values
+    above 1e-3 tend to under-fit minority classes
+
+Adopted:
+  - lr changed from 1e-3 to 5e-4 ✓
+  - batch_size changed from 512 to 256 ✓
+  - weight_decay = 1e-4 set in Adam ✓
+
+--------------------------------------------------------------------
+PROMPT 3 — Alert threshold validation
+Date: approx. session 2
+--------------------------------------------------------------------
+Prompt:
+  "My alert system uses thresholds 0.6 and 0.8 on the softmax max
+   confidence: <0.6 = LOW_CONF_ATTACK, 0.6–0.8 = SUSPICIOUS,
+   >0.8 = CRITICAL_ALERT.  My baseline gets FPR=13.46% and FN_hard=25%.
+   Can you suggest whether the thresholds are reasonable for a
+   security-first IDS, and how the improved model's better calibration
+   might affect them?"
+
+Claude's response (summarised):
+  - The 0.8 CRITICAL threshold is reasonable; raising it to 0.9 reduces
+    alert noise but risks more attacks landing in SUSPICIOUS
+  - With better calibration from BN, the improved model's confidence
+    distribution should shift: correct predictions cluster more tightly
+    near 1.0, so more true attacks clear the 0.8 threshold automatically
+  - Suggested computing precision/recall of the alert tiers explicitly
+    rather than just counting tier distribution — this is standard in
+    NIDS evaluation (see Moustafa & Slay 2016)
+  - Suggested logging "FN soft" (Attack→LOW_CONF_ATTACK) as a separate
+    risk metric, not just FN hard (Attack→NO_ALERT)
+
+Adopted:
+  - Thresholds retained at 0.6 / 0.8 — student agreed they represent
+    a reasonable balanced operating point for a lab setting ✓
+  - FN_soft metric explicitly logged and reported ✓
+  - Alert tier analysis added to evaluation section ✓
+
+--------------------------------------------------------------------
+PROMPT 4 — Macro-F1 vs Accuracy interpretation
+Date: approx. session 2
+--------------------------------------------------------------------
+Prompt:
+  "My baseline gets accuracy=0.76 but macro-F1=0.46.  How should I
+   interpret this gap in the context of UNSW-NB15 class imbalance?"
+
+Claude's response (summarised):
+  - High accuracy on imbalanced data is dominated by majority classes
+    (Normal 37k, Generic 18k, Exploits 11k) — the model achieves 99%
+    on Generic and that alone boosts overall accuracy
+  - Macro-F1 equally weights all 10 classes including Worms (44 train
+    samples) and Analysis (677 samples) — a model that fails on these
+    gets severely penalised in macro-F1 even if it's accurate overall
+  - Both metrics should be reported; macro-F1 is the primary indicator
+    of minority-class generalisation capability
+
+Adopted:
+  - Both accuracy and macro-F1 now reported and interpreted ✓
+  - Weighted-F1 also added as a middle ground metric ✓
+  - Report explicitly discusses this gap rather than hiding it ✓
