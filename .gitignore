@@ -9,12 +9,20 @@ dist/
 build/
 .env
 
-# Dataset (large files — add manually or via Git LFS)
-Dataset/*.csv
+# Dataset (large files)
+Dataset/
 
-# Model checkpoints (optional: commit if reproducibility required)
-outputs/models/*.pt
-outputs/models/*.pkl
+# Generated outputs
+outputs/
+
+# Reports and docs (human-written, not code)
+report.md
+report/
+docs/
+prompts/
+
+# Claude settings
+.claude/
 
 # IDE
 .vscode/
